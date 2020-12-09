@@ -1,0 +1,51 @@
+# Install Packages
+install.packages("tm")  # for text mining
+install.packages("SnowballC") # for text stemming
+install.packages("wordcloud") # word-cloud generator 
+install.packages("RColorBrewer") # color palettes
+install.packages("NLP")
+install.packages("tidyverse")
+install.packages("tokenizers")
+install.packages("wordcloud2")
+install.packages("stopwords")
+
+# Load Packages
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("RColorBrewer")
+library("NLP")
+library("tidyverse")
+library("tokenizers")
+library("wordcloud2")
+library("stopwords")
+
+text <- read.table(file.choose())
+
+read_table = read.table("trump_tweets.txt", fill = TRUE)
+
+tokenize_words(text, stopwords = stopwords::stopwords("en"))
+
+                        
+docs <- Corpus(VectorSource(text))
+
+toSpace <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+docs <- tm_map(docs, toSpace, "/")
+docs <- tm_map(docs, toSpace, "@")
+docs <- tm_map(docs, toSpace, "\\|")
+
+# Convert the text to lower case
+docs <- tm_map(docs, content_transformer(tolower))
+# Remove numbers
+docs <- tm_map(docs, removeNumbers)
+# Remove english common stopwords
+docs <- tm_map(docs, removeWords, stopwords("SMART"))
+# Remove punctuations
+docs <- tm_map(docs, removePunctuation)
+# Eliminate extra white spaces
+docs <- tm_map(docs, stripWhitespace)
+# Text stemming
+docs <- tm_map(docs, stemDocument)
+
+
+wordcloud2(data = read_table)

@@ -1,0 +1,103 @@
+---
+title: "An Analysis of Donald Trump's Tweets"
+author: "Thomas Birthin Schmidt"
+date: "7/12/2020"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+# The local file path of the Trump Tweets
+Online I found a spreadsheet containing all of Donald Trumps tweets from 2009-2020, with the majority of those tweets being tweeted after Obama got reelected and during his own precidency. I exported the document into a .txt file containing only his tweets and retweets. This file's filepath is then assigned to the character-class "path" for future use.
+```{r}
+path <- 'C:/Users/thoma/Desktop/DM Trump Tweets/trump_tweets.txt'
+
+dat <- read.table(path, header = FALSE, fill = TRUE)
+```
+
+# Loading the libraries (previously installed)
+I now need to load up all the libraries used. During trial and errors of writing this paper, all libraries have been previously installed. Thus, there is no need to install them again and I am only loading them up.
+```{r}
+library(webshot)
+library(dplyr) # for data wrangling
+library(tidytext) # for NLP
+library(stringr) # to deal with strings
+library(wordcloud) # to render wordclouds
+library(knitr) # for tables
+library(DT) # for dynamic, searchable tables
+library(tidyr) #for reshaping the data frame into a one column data frame using the function "gather()"
+```
+
+# Dataframe
+With the data loaded into the "dat" class, I now want to shape this data frame into a one column data frame with only one word for each row using the "tidyr::gather" function. Next, I print out the total number of rows.
+```{r}
+#reshaping my data frame into a new one column data frame
+tidy_dat <- tidyr::gather(dat, key, word) %>% select(word)
+
+tidy_dat$word %>% length() #Printing out the toal number of rows: 2366602
+```
+It would be nice to know how many unique words we have, instead of the total number of words. We need to keep in mind, that this includes every different versions of every word (america, american, american's etc.) To do that, we use the following code
+```{r}
+unique(tidy_dat$word) %>% length() #It prints out the total number of unique words: 100919
+```
+# Tokenizing
+Now I want to focus my dataframe on only including the unique words and counting each of those, as this will make it possible to analyse the frequency of the different words used. To do this, we 'tokenize' our dataframe.
+We do this with the function "unnest_token()". To count all the unique words we use the count() function.
+
+```{r}
+tokens <- tidy_dat %>% 
+  unnest_tokens(word, word) %>% 
+  dplyr::count(word, sort = TRUE) %>% 
+  ungroup()
+```
+
+Now we can bring up a table with the 10 most used words. But, because we haven't yet cleaned our text from meaningless words, the top 10 list is currently useless. See the example below, where none of the top 10 words tells us anything at all.
+```{r}
+tokens %>% head(10)
+```
+
+# Stopwords
+To fix the above problem I need to clean the data frame with a stopword list. Essentially, this list is a list of common words, that I do not want our code to include when it tallies up the most used words, and using the "anti_join" function I exclude these wordsm, and copy the remaining words into a new function called "tokens_clean". Luckily, Rstudio has a built-in stopword list of common english words. For starters, I will use this stopword list.
+```{r}
+data("stop_words")
+tokens_clean <- tokens %>%
+  anti_join(stop_words)
+```
+
+Next up I'll clean off all the numbers using a very detailed code I found online, which filters out the numbers from our new function.
+```{r}
+nums <- tokens_clean %>% filter(str_detect(word, "^[0-9]")) %>% select(word) %>% unique()
+
+tokens_clean <- tokens_clean %>% 
+  anti_join(nums, by = "word")
+```
+
+At this point, I glanced at the tokens_clean, to see if any words have escaped the stopword-list, as the list used was a generic list. Quickly, the second most used word "amp", repeated 5415 times gets my attention. Apparently, this is an html standard input, when the computer doesn't recognize the character. Therefore, this needs to go on my stopword list as well. My focus of analysing Donald Trumps tweets is to see which words, apart from the expected regularly used words, that he has used most. Further examination of the tokens_clean list shows me, that he writes a bunch of words that seems very common and is expected of him to repeat - taking the examined issue into consideration. These are words like: donald, trump, country, day, president and realdonaldtrump. These will be added to the list as well.
+
+```{r}
+uni_sw <- data.frame(word = c("amp", "donald", "trump", "country", "day", "president", "realdonaldtrump"))
+
+tokens_clean <- tokens_clean %>% 
+  anti_join(uni_sw, by = "word")
+```
+
+It also comes to mind, that words like 'job' and 'jobs' have been split into two words instead of one word, even though they refer to the same thing. Unfortunately, I have no Idea how to change that. It also happens with 'fox' being both 'foxnews' and 'fox news' (no space/space). However, looking at the top 100 words from the tokens_clean list, it doesn't seem to be a big recurring problem, and I will not attempt to fix it. One should however keep in mind, that it could potentially change the word cloud and the list generated in the end. The problem could possibly be fixed by stemming the words. I did attempt this using both "snowballC::wordStem"-function as well as "pr_stem_words"-function. Unfortunately, this resulted in an error code I could not get out of, and I opted to ignore the stemming process.  
+
+# Creating a Wordcloud
+Now, let's create the word cloud. First we will define a color palette using the "brewer.pal"-function. Next we create the wordcloud using the "wordcloud"-function. One could play around with the number of words used and the scaling (size-wise). If one were to use the wordcloud2 function, one could possible shape the wordcloud into forming the word "Trump". This would be a bit funny, but rather useless. Therefore, I am only using the regular "wordcloud"-function. 
+```{r}
+# define a nice color palette
+pal <- brewer.pal(8,"Dark2")
+
+# plot the 80 most common words
+tokens_clean %>% 
+  with(wordcloud(word, n, random.order = FALSE, max.words = 80, colors=pal, scale = c(4, 0.35)))
+```
+
+# Creating a searchable data table
+Last but not least, I want to create a list of the most used words. Instead of a refular list, I will create a searchable data table, as this is much more useful. Once again, when searching through that list it shows us that grouping stemwords ('america' being the stem, grouped words being 'american', americans') would be nice, and further work on this research-paper could grant new/improved information through that process.
+
+```{r}
+tokens_clean %>%
+  DT::datatable()
+```
